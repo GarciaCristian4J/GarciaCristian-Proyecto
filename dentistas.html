@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Dentistas - Sistema Consultorio</title>
+  <style>
+    :root { --principal: #584ca5; --fondo: #f4f4f9; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--fondo); margin: 0; padding: 20px; }
+    
+    /* Contenedor del Layout de dos columnas */
+    .contenedor-principal { 
+      display: flex; 
+      flex-direction: row;
+      gap: 20px; 
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    /* COLUMNA IZQUIERDA (Formulario) */
+    .columna-izquierda { 
+      flex: 0 0 320px; /* Ancho fijo para el formulario */
+    }
+    
+    /* COLUMNA DERECHA (Tablas) */
+    .columna-derecha { 
+      flex: 1; /* Ocupa todo el espacio restante a la derecha */
+      min-width: 0; /* Evita que las tablas grandes rompan el diseño */
+    }
+    
+    .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    
+    /* Estilos de la Tabla */
+    .tabla-contenedor { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; min-width: 600px; }
+    th, td { border: 1px solid #cccccc; padding: 12px 10px; text-align: left; }
+    th { background-color: var(--principal); color: white; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f9f9fb; }
+    
+    /* Inputs y Botones */
+    input { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { background: var(--principal); color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+    .btn-cancelar { background: #aaa; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; display: none; }
+    .btn-editar { background: #f0ad4e; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; font-weight: bold; }
+    .btn-borrar { background: #d9534f; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .menu-btn { display: inline-block; margin-bottom: 10px; color: #584ca5; text-decoration: none; font-weight: 700; }
+    .menu-btn:hover { text-decoration: underline; }
+
+  </style>
+</head>
+<body>
+
+  <div class="contenedor-principal">
+    
+    <div class="columna-izquierda">
+      <div class="card">
+        <a class="menu-btn" href="index.html">← Volver al menú</a>
+        <h2 id="tituloForm">Registrar Dentista</h2>
+        <form id="formDentista">
+          <label>ID Dentista (_id):</label> <input type="text" id="id_dentista" required>
+          <label>Nombre Completo:</label> <input type="text" id="nombre_completo" required>
+          <label>Especialidad:</label> <input type="text" id="especialidad" required>
+          <label>Días que Trabaja:</label> <input type="text" id="dias_que_trabaja" required>
+          <label>Horas que Trabaja:</label> <input type="text" id="horas_que_trabaja" required>
+          <label>Teléfono:</label> <input type="text" id="telefono" required>
+          <label>Correo Electrónico:</label> <input type="text" id="correo_electronico" required>
+          <button type="submit" id="btnGuardar" class="btn">Registrar Dentista</button>
+          <button type="button" id="btnCancelar" class="btn-cancelar" onclick="limpiarEdicion()">Cancelar</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="columna-derecha">
+      <div class="card">
+        <h2>Colección: dentistas (MongoDB Atlas)</h2>
+        <div class="tabla-contenedor">
+          <table>
+            <thead>
+              <tr>
+                <th>_id</th>
+                <th>nombre completo</th>
+                <th>especialidad</th>
+                <th>dias que trabaja</th>
+                <th>horas que trabaja</th>
+                <th>telefono</th>
+                <th>Correo electronico</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let modoEdicion = false;
+    let listaDentistas = [];
+
+    document.addEventListener("DOMContentLoaded", cargar);
+
+    async function cargar() {
+      try {
+        const res = await fetch('/api/dentistas');
+        listaDentistas = await res.json();
+        const tbody = document.getElementById('tabla');
+        tbody.innerHTML = '';
+        
+        if (listaDentistas.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#777;">No hay registros en la colección de Atlas.</td></tr>`;
+          return;
+        }
+
+        listaDentistas.forEach((d, index) => {
+          tbody.innerHTML += `
+            <tr>
+              <td><b>${d._id}</b></td>
+              <td>${d.nombre_completo}</td>
+              <td>${d.especialidad}</td>
+              <td>${d.dias_que_trabaja}</td>
+              <td>${d.horas_que_trabaja}</td>
+              <td>${d.telefono}</td>
+              <td>${d.correo_electronico}</td>
+              <td>
+                <button class="btn-editar" onclick="prepararEdicion(${index})">Editar</button>
+                <button class="btn-borrar" onclick="eliminar('${d._id}')">Eliminar</button>
+              </td>
+            </tr>`;
+        });
+      } catch (err) {
+        console.error("Error al cargar datos:", err);
+      }
+    }
+
+    document.getElementById('formDentista').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const datos = {
+        id_dentista: document.getElementById('id_dentista').value,
+        nombre_completo: document.getElementById('nombre_completo').value,
+        especialidad: document.getElementById('especialidad').value,
+        dias_que_trabaja: document.getElementById('dias_que_trabaja').value,
+        horas_que_trabaja: document.getElementById('horas_que_trabaja').value,
+        telefono: document.getElementById('telefono').value,
+        correo_electronico: document.getElementById('correo_electronico').value
+      };
+
+      const endpoint = modoEdicion ? '/api/dentistas/actualizar' : '/api/dentistas';
+      const metodo = modoEdicion ? 'PUT' : 'POST';
+
+      await fetch(endpoint, {
+        method: metodo,
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(datos)
+      });
+      
+      limpiarEdicion();
+      cargar();
+    });
+
+    function prepararEdicion(index) {
+      const d = listaDentistas[index];
+      modoEdicion = true;
+      document.getElementById('tituloForm').innerText = "Modificar Dentista";
+      document.getElementById('btnGuardar').innerText = "Guardar Cambios";
+      document.getElementById('btnCancelar').style.display = "block";
+      
+      const inputId = document.getElementById('id_dentista');
+      inputId.value = d._id;
+      inputId.readOnly = true;
+      inputId.style.backgroundColor = "#e9ecef";
+      
+      document.getElementById('nombre_completo').value = d.nombre_completo;
+      document.getElementById('especialidad').value = d.especialidad;
+      document.getElementById('dias_que_trabaja').value = d.dias_que_trabaja;
+      document.getElementById('horas_que_trabaja').value = d.horas_que_trabaja;
+      document.getElementById('telefono').value = d.telefono;
+      document.getElementById('correo_electronico').value = d.correo_electronico;
+    }
+
+    function limpiarEdicion() {
+      modoEdicion = false;
+      document.getElementById('tituloForm').innerText = "Registrar Dentista";
+      document.getElementById('btnGuardar').innerText = "Registrar Dentista";
+      document.getElementById('btnCancelar').style.display = "none";
+      
+      const inputId = document.getElementById('id_dentista');
+      inputId.readOnly = false;
+      inputId.style.backgroundColor = "#fff";
+      
+      document.getElementById('formDentista').reset();
+    }
+
+    async function eliminar(id) {
+      if(confirm('¿Eliminar registro?')) {
+        await fetch('/api/dentistas/' + id, { method: 'DELETE' });
+        cargar();
+      }
+    }
+  </script>
+</body>
+</html>
