@@ -1,0 +1,223 @@
+const express = require('express');
+const { MongoClient, ObjectId } = require('mongodb');
+const path = require('path');
+const app = express();
+const PORT = 3000;
+
+// Configuración de conexión a MongoDB Atlas
+const url =  "mongodb://Mi-primer-cluster:HolaXD@ac-rtwnszb-shard-00-00.rvw46nw.mongodb.net:27017,ac-rtwnszb-shard-00-01.rvw46nw.mongodb.net:27017,ac-rtwnszb-shard-00-02.rvw46nw.mongodb.net:27017/?ssl=true&replicaSet=atlas-59cj3l-shard-0&authSource=admin&appName=Cluster0";
+const dbName = 'Dentistas-felices'; 
+let db;
+
+MongoClient.connect(url)
+  .then(client => {
+    console.log('Conectado a MongoDB Atlas (Dentistas-felices)');
+    db = client.db(dbName);
+  })
+  .catch(error => {
+    console.error('Error al conectar a MongoDB:', error);
+  });
+
+app.use(express.json());
+app.use(express.static(__dirname));
+
+function formatearId(id) {
+  if (!id) return id;
+  if (ObjectId.isValid(id) && id.length === 24) {
+    return new ObjectId(id);
+  }
+  return id;
+}
+
+// ==========================================
+// CRUD: PACIENTES (Campos exactos de Atlas)
+// ==========================================
+app.get('/api/pacientes', async (req, res) => {
+  try {
+    const datos = await db.collection('pacientes').find().toArray();
+    const mapeados = datos.map(p => ({
+      _id: p._id,
+      nombre_completo: p['nombre completo'] || p.nombre_completo || '',
+      edad: p.edad || '',
+      sexo: p.sexo || '',
+      calle: p['privada de sol'] || p.calle || '',
+      alergia: p.alergia || p.alergias || '',
+      telefono: p.telefono || '',
+      correo_electronico: p['Correo electronico'] || p.correo_electronico || '',
+      tipodesangre: p['tipo de sangre'] || p.tipodesangre || ''
+    }));
+    res.status(200).json(mapeados);
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.post('/api/pacientes', async (req, res) => {
+  try {
+    const p = req.body;
+    const nuevo = {
+      _id: p.id_paciente,
+      "nombre completo": p.nombre_completo,
+      edad: parseInt(p.edad),
+      sexo: p.sexo,
+      "privada de sol": p.calle,
+      alergia: p.alergia,
+      telefono: p.telefono,
+      "Correo electronico": p.correo_electronico,
+      "tipo de sangre": p.tipodesangre
+    };
+    await db.collection('pacientes').insertOne(nuevo);
+    res.status(200).json({ ok: true });
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.put('/api/pacientes/actualizar', async (req, res) => {
+  try {
+    const p = req.body;
+    await db.collection('pacientes').updateOne(
+      { _id: p.id_paciente },
+      { $set: {
+          "nombre completo": p.nombre_completo,
+          edad: parseInt(p.edad),
+          sexo: p.sexo,
+          "privada de sol": p.calle,
+          alergia: p.alergia,
+          telefono: p.telefono,
+          "Correo electronico": p.correo_electronico,
+          "tipo de sangre": p.tipodesangre
+        }
+      }
+    );
+    res.status(200).json({ ok: true });
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.delete('/api/pacientes/:id', async (req, res) => {
+  try {
+    await db.collection('pacientes').deleteOne({ _id: formatearId(req.params.id) });
+    res.status(200).send({ ok: true });
+  } catch (error) { res.status(500).send(error); }
+});
+
+// ==========================================
+// CRUD: DENTISTAS (Campos exactos de Atlas)
+// ==========================================
+app.get('/api/dentistas', async (req, res) => {
+  try {
+    const datos = await db.collection('dentistas').find().toArray();
+    const mapeados = datos.map(d => ({
+      _id: d._id,
+      nombre_completo: d['nombre completo'] || '',
+      especialidad: d.especialidad || '',
+      dias_que_trabaja: d['dias que trabaja'] || '',
+      horas_que_trabaja: d['horas que trabaja'] || '',
+      telefono: d.telefono || '',
+      correo_electronico: d['Correo electronico'] || ''
+    }));
+    res.status(200).json(mapeados);
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.post('/api/dentistas', async (req, res) => {
+  try {
+    const d = req.body;
+    const nuevo = {
+      _id: d.id_dentista,
+      "nombre completo": d.nombre_completo,
+      especialidad: d.especialidad,
+      "dias que trabaja": d.dias_que_trabaja,
+      "horas que trabaja": d.horas_que_trabaja,
+      telefono: d.telefono,
+      "Correo electronico": d.correo_electronico
+    };
+    await db.collection('dentistas').insertOne(nuevo);
+    res.status(200).json({ ok: true });
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.put('/api/dentistas/actualizar', async (req, res) => {
+  try {
+    const d = req.body;
+    await db.collection('dentistas').updateOne(
+      { _id: d.id_dentista },
+      { $set: {
+          "nombre completo": d.nombre_completo,
+          especialidad: d.especialidad,
+          "dias que trabaja": d.dias_que_trabaja,
+          "horas que trabaja": d.horas_que_trabaja,
+          telefono: d.telefono,
+          "Correo electronico": d.correo_electronico
+        }
+      }
+    );
+    res.status(200).json({ ok: true });
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.delete('/api/dentistas/:id', async (req, res) => {
+  try {
+    await db.collection('dentistas').deleteOne({ _id: formatearId(req.params.id) });
+    res.status(200).send({ ok: true });
+  } catch (error) { res.status(500).send(error); }
+});
+
+// ==========================================
+// CRUD: CITAS (Campos exactos de Atlas)
+// ==========================================
+app.get('/api/citas', async (req, res) => {
+  try {
+    const datos = await db.collection('citas').find().toArray();
+    const mapeados = datos.map(c => ({
+      _id: c._id,
+      que_se_hara: c['Que se hara'] || '',
+      hora_de_inicio_a_fin: c['hora de inicio a fin'] || '',
+      tipo_de_cita: c['Tipo de cita'] || '',
+      sala: c.sala || '',
+      estado: c.estado || ''
+    }));
+    res.status(200).json(mapeados);
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.post('/api/citas', async (req, res) => {
+  try {
+    const c = req.body;
+    const nueva = {
+      _id: c.id_cita,
+      "Que se hara": c.que_se_hara,
+      "hora de inicio a fin": c.hora_de_inicio_a_fin,
+      "Tipo de cita": c.tipo_de_cita,
+      sala: c.sala,
+      estado: c.estado
+    };
+    await db.collection('citas').insertOne(nueva);
+    res.status(200).json({ ok: true });
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.put('/api/citas/actualizar', async (req, res) => {
+  try {
+    const c = req.body;
+    await db.collection('citas').updateOne(
+      { _id: c.id_cita },
+      { $set: {
+          "Que se hara": c.que_se_hara,
+          "hora de inicio a fin": c.hora_de_inicio_a_fin,
+          "Tipo de cita": c.tipo_de_cita,
+          sala: c.sala,
+          estado: c.estado
+        }
+      }
+    );
+    res.status(200).json({ ok: true });
+  } catch (e) { res.status(500).send(e); }
+});
+
+app.delete('/api/citas/:id', async (req, res) => {
+  try {
+    await db.collection('citas').deleteOne({ _id: formatearId(req.params.id) });
+    res.status(200).send({ ok: true });
+  } catch (error) { res.status(500).send(error); }
+});
+
+app.listen(PORT, () => {
+  console.log(`Servidor en ejecución: http://localhost:${PORT}`);
+});
