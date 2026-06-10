@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Pacientes - Sistema Consultorio</title>
+  <style>
+    :root { --principal: #584ca5; --fondo: #f4f4f9; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--fondo); margin: 0; padding: 20px; }
+    
+    .contenedor-principal { 
+      display: flex; 
+      flex-direction: row;
+      gap: 20px; 
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .columna-izquierda { flex: 0 0 320px; }
+    .columna-derecha { flex: 1; min-width: 0; }
+    .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    
+    .tabla-contenedor { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; min-width: 800px; }
+    th, td { border: 1px solid #cccccc; padding: 12px 10px; text-align: left; }
+    th { background-color: var(--principal); color: white; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f9f9fb; }
+    
+    input { width: 100%; padding: 7px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { background: var(--principal); color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+    .btn-cancelar { background: #aaa; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; display: none; }
+    .btn-editar { background: #f0ad4e; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; font-weight: bold; }
+    .btn-borrar { background: #d9534f; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .menu-btn { display: inline-block; margin-bottom: 10px; color: #584ca5; text-decoration: none; font-weight: 700; }
+    .menu-btn:hover { text-decoration: underline; }
+
+  </style>
+</head>
+<body>
+
+  <div class="contenedor-principal">
+    
+    <div class="columna-izquierda">
+      <div class="card">
+        <a class="menu-btn" href="index.html">← Volver al menú</a>
+        <h2 id="tituloForm">Alta Paciente</h2>
+        <form id="formPaciente">
+          <label>ID Paciente (_id):</label> <input type="text" id="id_paciente" required>
+          <label>Nombre Completo:</label> <input type="text" id="nombre_completo" required>
+          <label>Edad:</label> <input type="number" id="edad" required>
+          <label>Sexo:</label> <input type="text" id="sexo" required>
+          <label>Dirección:</label> <input type="text" id="calle" required>
+          <label>Alergias:</label> <input type="text" id="alergia" required>
+          <label>Teléfono:</label> <input type="text" id="telefono" required>
+          <label>Correo Electrónico:</label> <input type="text" id="correo_electronico" required>
+          <label>Tipo de Sangre:</label> <input type="text" id="tipodesangre" required>
+          <button type="submit" id="btnGuardar" class="btn">Registrar Paciente</button>
+          <button type="button" id="btnCancelar" class="btn-cancelar" onclick="limpiarEdicion()">Cancelar</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="columna-derecha">
+      <div class="card">
+        <h2>Colección: pacientes (MongoDB Atlas)</h2>
+        <div class="tabla-contenedor">
+          <table>
+            <thead>
+              <tr>
+                <th>_id</th>
+                <th>nombre completo</th>
+                <th>edad</th>
+                <th>sexo</th>
+                <th>privada de sol</th>
+                <th>alergia</th>
+                <th>telefono</th>
+                <th>Correo electronico</th>
+                <th>tipo de sangre</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let modoEdicion = false;
+    let listaPacientes = [];
+
+    document.addEventListener("DOMContentLoaded", cargar);
+
+    async function cargar() {
+      try {
+        const res = await fetch('/api/pacientes');
+        listaPacientes = await res.json();
+        const tbody = document.getElementById('tabla');
+        tbody.innerHTML = '';
+        
+        if (listaPacientes.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; color:#777;">No hay registros en la colección de Atlas.</td></tr>`;
+          return;
+        }
+
+        listaPacientes.forEach((p, index) => {
+          tbody.innerHTML += `
+            <tr>
+              <td><b>${p._id}</b></td>
+              <td>${p.nombre_completo}</td>
+              <td>${p.edad}</td>
+              <td>${p.sexo}</td>
+              <td>${p.calle}</td>
+              <td>${p.alergia}</td>
+              <td>${p.telefono}</td>
+              <td>${p.correo_electronico}</td>
+              <td>${p.tipodesangre}</td>
+              <td>
+                <button class="btn-editar" onclick="prepararEdicion(${index})">Editar</button>
+                <button class="btn-borrar" onclick="eliminar('${p._id}')">Borrar</button>
+              </td>
+            </tr>`;
+        });
+      } catch (err) {
+        console.error("Error al cargar datos:", err);
+      }
+    }
+
+    document.getElementById('formPaciente').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const datos = {
+        id_paciente: document.getElementById('id_paciente').value,
+        nombre_completo: document.getElementById('nombre_completo').value,
+        edad: document.getElementById('edad').value,
+        sexo: document.getElementById('sexo').value,
+        calle: document.getElementById('calle').value,
+        alergia: document.getElementById('alergia').value,
+        telefono: document.getElementById('telefono').value,
+        correo_electronico: document.getElementById('correo_electronico').value,
+        tipodesangre: document.getElementById('tipodesangre').value
+      };
+
+      const endpoint = modoEdicion ? '/api/pacientes/actualizar' : '/api/pacientes';
+      const metodo = modoEdicion ? 'PUT' : 'POST';
+
+      await fetch(endpoint, {
+        method: metodo,
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(datos)
+      });
+      
+      limpiarEdicion();
+      cargar();
+    });
+
+    function prepararEdicion(index) {
+      const p = listaPacientes[index];
+      modoEdicion = true;
+      document.getElementById('tituloForm').innerText = "Modificar Paciente";
+      document.getElementById('btnGuardar').innerText = "Guardar Cambios";
+      document.getElementById('btnCancelar').style.display = "block";
+      
+      const inputId = document.getElementById('id_paciente');
+      inputId.value = p._id;
+      inputId.readOnly = true;
+      inputId.style.backgroundColor = "#e9ecef";
+      
+      document.getElementById('nombre_completo').value = p.nombre_completo;
+      document.getElementById('edad').value = p.edad;
+      document.getElementById('sexo').value = p.sexo;
+      document.getElementById('calle').value = p.calle;
+      document.getElementById('alergia').value = p.alergia;
+      document.getElementById('telefono').value = p.telefono;
+      document.getElementById('correo_electronico').value = p.correo_electronico;
+      document.getElementById('tipodesangre').value = p.tipodesangre;
+    }
+
+    function limpiarEdicion() {
+      modoEdicion = false;
+      document.getElementById('tituloForm').innerText = "Alta Paciente";
+      document.getElementById('btnGuardar').innerText = "Registrar Paciente";
+      document.getElementById('btnCancelar').style.display = "none";
+      
+      const inputId = document.getElementById('id_paciente');
+      inputId.readOnly = false;
+      inputId.style.backgroundColor = "#fff";
+      
+      document.getElementById('formPaciente').reset();
+    }
+
+    async function eliminar(id) {
+      if(confirm('¿Eliminar paciente?')) {
+        await fetch('/api/pacientes/' + id, { method: 'DELETE' });
+        cargar();
+      }
+    }
+  </script>
+</body>
+</html>
