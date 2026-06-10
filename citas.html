@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Citas - Sistema Consultorio</title>
+  <style>
+    :root { --principal: #584ca5; --fondo: #f4f4f9; }
+    body { font-family: 'Segoe UI', sans-serif; background: var(--fondo); margin: 0; padding: 20px; }
+    
+    .contenedor-principal { 
+      display: flex; 
+      flex-direction: row;
+      gap: 20px; 
+      width: 100%;
+      box-sizing: border-box;
+    }
+    
+    .columna-izquierda { flex: 0 0 320px; }
+    .columna-derecha { flex: 1; min-width: 0; }
+    .card { background: #fff; border-radius: 8px; padding: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    
+    .tabla-contenedor { width: 100%; overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; min-width: 600px; }
+    th, td { border: 1px solid #cccccc; padding: 12px 10px; text-align: left; }
+    th { background-color: var(--principal); color: white; font-weight: bold; }
+    tr:nth-child(even) { background-color: #f9f9fb; }
+    
+    input { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
+    .btn { background: var(--principal); color: white; padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; font-weight: bold; }
+    .btn-cancelar { background: #aaa; color: white; padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; width: 100%; margin-top: 5px; display: none; }
+    .btn-editar { background: #f0ad4e; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; margin-right: 4px; font-weight: bold; }
+    .btn-borrar { background: #d9534f; color: white; padding: 5px 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+    .menu-btn { display: inline-block; margin-bottom: 10px; color: #584ca5; text-decoration: none; font-weight: 700; }
+    .menu-btn:hover { text-decoration: underline; }
+
+  </style>
+</head>
+<body>
+
+  <div class="contenedor-principal">
+    
+    <div class="columna-izquierda">
+      <div class="card">
+        <a class="menu-btn" href="index.html">← Volver al menú</a>
+        <h2 id="tituloForm">Agendar Cita</h2>
+        <form id="formCita">
+          <label>ID Cita (_id):</label> <input type="text" id="id_cita" required>
+          <label>¿Qué se hará?:</label> <input type="text" id="que_se_hara" required>
+          <label>Hora de Inicio a Fin:</label> <input type="text" id="hora_de_inicio_a_fin" required>
+          <label>Tipo de Cita:</label> <input type="text" id="tipo_de_cita" required>
+          <label>Sala:</label> <input type="text" id="sala" required>
+          <label>Estado:</label> <input type="text" id="estado" required>
+          <button type="submit" id="btnGuardar" class="btn">Registrar Cita</button>
+          <button type="button" id="btnCancelar" class="btn-cancelar" onclick="limpiarEdicion()">Cancelar</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="columna-derecha">
+      <div class="card">
+        <h2>Colección: citas (MongoDB Atlas)</h2>
+        <div class="tabla-contenedor">
+          <table>
+            <thead>
+              <tr>
+                <th>_id</th>
+                <th>Que se hara</th>
+                <th>hora de inicio a fin</th>
+                <th>Tipo de cita</th>
+                <th>sala</th>
+                <th>estado</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="tabla">
+              </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let modoEdicion = false;
+    let listaCitas = [];
+
+    document.addEventListener("DOMContentLoaded", cargar);
+
+    async function cargar() {
+      try {
+        const res = await fetch('/api/citas');
+        listaCitas = await res.json();
+        const tbody = document.getElementById('tabla');
+        tbody.innerHTML = '';
+        
+        if (listaCitas.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#777;">No hay registros en la colección de Atlas.</td></tr>`;
+          return;
+        }
+
+        listaCitas.forEach((c, index) => {
+          tbody.innerHTML += `
+            <tr>
+              <td><b>${c._id}</b></td>
+              <td>${c.que_se_hara}</td>
+              <td>${c.hora_de_inicio_a_fin}</td>
+              <td>${c.tipo_de_cita}</td>
+              <td>${c.sala}</td>
+              <td>${c.estado}</td>
+              <td>
+                <button class="btn-editar" onclick="prepararEdicion(${index})">Editar</button>
+                <button class="btn-borrar" onclick="eliminar('${c._id}')">Remover</button>
+              </td>
+            </tr>`;
+        });
+      } catch (err) {
+        console.error("Error al cargar datos:", err);
+      }
+    }
+
+    document.getElementById('formCita').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const datos = {
+        id_cita: document.getElementById('id_cita').value,
+        que_se_hara: document.getElementById('que_se_hara').value,
+        hora_de_inicio_a_fin: document.getElementById('hora_de_inicio_a_fin').value,
+        tipo_de_cita: document.getElementById('tipo_de_cita').value,
+        sala: document.getElementById('sala').value,
+        estado: document.getElementById('estado').value
+      };
+
+      const endpoint = modoEdicion ? '/api/citas/actualizar' : '/api/citas';
+      const metodo = modoEdicion ? 'PUT' : 'POST';
+
+      await fetch(endpoint, {
+        method: metodo,
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(datos)
+      });
+      
+      limpiarEdicion();
+      cargar();
+    });
+
+    function prepararEdicion(index) {
+      const c = listaCitas[index];
+      modoEdicion = true;
+      document.getElementById('tituloForm').innerText = "Modificar Cita";
+      document.getElementById('btnGuardar').innerText = "Guardar Cambios";
+      document.getElementById('btnCancelar').style.display = "block";
+      
+      const inputId = document.getElementById('id_cita');
+      inputId.value = c._id;
+      inputId.readOnly = true;
+      inputId.style.backgroundColor = "#e9ecef";
+      
+      document.getElementById('que_se_hara').value = c.que_se_hara;
+      document.getElementById('hora_de_inicio_a_fin').value = c.hora_de_inicio_a_fin;
+      document.getElementById('tipo_de_cita').value = c.tipo_de_cita;
+      document.getElementById('sala').value = c.sala;
+      document.getElementById('estado').value = c.estado;
+    }
+
+    function limpiarEdicion() {
+      modoEdicion = false;
+      document.getElementById('tituloForm').innerText = "Agendar Cita";
+      document.getElementById('btnGuardar').innerText = "Registrar Cita";
+      document.getElementById('btnCancelar').style.display = "none";
+      
+      const inputId = document.getElementById('id_cita');
+      inputId.readOnly = false;
+      inputId.style.backgroundColor = "#fff";
+      
+      document.getElementById('formCita').reset();
+    }
+
+    async function eliminar(id) {
+      if(confirm('¿Remover cita?')) {
+        await fetch('/api/citas/' + id, { method: 'DELETE' });
+        cargar();
+      }
+    }
+  </script>
+</body>
+</html>
